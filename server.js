@@ -655,6 +655,41 @@ app.get("/api/dashboard", requireAuth, async function (req, res) {
     }
 });
 
+/* ADD TO server.js (next to the other /api routes), then restart the server. */
+
+app.get("/api/report", requireAuth, async function (req, res) {
+    try {
+        const allowed = ["rent-roll", "occupancy", "contract-expiry", "vacancy-aging"];
+        const { report, buildingId, categoryId, from, to } = req.query;
+
+        if (!allowed.includes(report)) {
+            return res.status(400).json({ message: "Unknown report" });
+        }
+
+        const isDate = v => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
+
+        const result = await pool.query(`
+            SELECT "LMS_PORTAL".get_report($1, $2, $3, $4, $5);
+        `, [
+            report,
+            buildingId && buildingId !== "all" ? buildingId : null,
+            categoryId && categoryId !== "all" ? categoryId : null,
+            isDate(from) ? from : null,
+            isDate(to) ? to : null
+        ]);
+
+        res.json(result.rows[0].get_report || []);
+
+    } catch (error) {
+        console.error("GET REPORT ERROR:", error);
+
+        res.status(500).json({
+            message: "Failed to generate report",
+            error: error.message
+        });
+    }
+});
+
 /* SERVER */
 
 app.listen(3000, function () {
